@@ -9,6 +9,8 @@ describe "Authentication" do
 
     it { should have_content('Sign in') }
     it { should have_title('Sign in') }
+    it { should_not have_link('Profile') }
+    it { should_not have_link('Settings') }
   end
 
   describe 'signin' do
@@ -19,6 +21,8 @@ describe "Authentication" do
 
       it { should have_title('Sign in') }
       it { should have_selector('div.alert.alert-error', text: 'Invalid') }
+      it { should_not have_link('Profile') }
+      it { should_not have_link('Settings') }
 
       describe 'after visiting another page' do
         before { click_link "Home" }
@@ -29,9 +33,7 @@ describe "Authentication" do
     describe 'with valid information' do
       let(:user) { FactoryGirl.create(:user) }
       before do
-        fill_in "Email", with: user.email.upcase
-        fill_in "Password", with: user.password
-        click_button "Sign in"
+        sign_in user
       end
 
       it { should have_title(user.name) }
@@ -55,9 +57,7 @@ describe "Authentication" do
       describe "when attempting to visit a protected page" do
         before do
           visit edit_user_path(user)
-          fill_in "Email", with: user.email
-          fill_in "Password", with: user.password
-          click_button "Sign in"
+          sign_in user
         end
 
         describe "after signing in" do
@@ -68,7 +68,7 @@ describe "Authentication" do
         end
       end
 
-      describe "in th Users controller" do
+      describe "in the Users controller" do
 
         describe "visiting the edit page" do
           before { visit edit_user_path(user) }
@@ -83,6 +83,32 @@ describe "Authentication" do
         describe "visigint the user index" do
           before { visit users_path }
           it { should have_title('Sign in') }
+        end
+      end
+
+      describe "when attempting to visit a protected page" do
+        before do
+          visit edit_user_path(user)
+          sign_in user
+        end
+
+        describe "after signing in" do
+
+          it "should render the desired protected page" do
+            expect(page).to have_title('Edit user')
+          end
+
+          describe "when signinig in again" do
+            before do
+              delete signout_path
+              visit signin_path
+              sign_in user
+            end
+
+            it "should render the default (projile) page" do
+              expect(page).to have_title(user.name)
+            end
+          end
         end
       end
     end
@@ -112,6 +138,35 @@ describe "Authentication" do
 
       describe "submitting a DELETE request to the Users#destroy action" do
         before { delete user_path(user) }
+        specify { expect(response).to redirect_to(root_path) }
+      end
+    end
+
+    describe "as admin user" do
+      let(:admin) { FactoryGirl.create(:admin) }
+
+      before { sign_in admin, no_capybara: true }
+
+      describe "submitting a DELETE request to the Users#destory action" do
+        before { delete user_path(admin) }
+        specify { expect(response).to redirect_to(root_path) }
+      end
+    end
+
+    describe "singd in user action check" do
+      let(:user) { FactoryGirl.create(:user) }
+      before do
+        sign_in user, no_capybara: true
+      end
+
+      describe "submitting a GET request to the User#new action" do
+        before { get signup_path }
+        specify { expect(response.body).not_to match(full_title('Sign up')) }
+        specify { expect(response).to redirect_to(root_url) }
+      end
+
+      describe "submitting a POST request to the User#create action" do
+        before { post users_path }
         specify { expect(response).to redirect_to(root_path) }
       end
     end
